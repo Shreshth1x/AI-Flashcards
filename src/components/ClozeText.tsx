@@ -49,12 +49,14 @@ const commaMatcher: Matcher = (text, pos) => {
 
 function splitByMatcher(
   segments: ClozeSegment[],
-  matcher: Matcher
+  matcher: Matcher,
+  crossBoundary = false
 ): ClozeSegment[][] {
   const groups: ClozeSegment[][] = [[]];
   let depth = 0;
 
-  for (const seg of segments) {
+  for (let segIdx = 0; segIdx < segments.length; segIdx++) {
+    const seg = segments[segIdx];
     if (seg.kind === "cloze") {
       groups[groups.length - 1].push(seg);
       continue;
@@ -78,9 +80,8 @@ function splitByMatcher(
         const m = matcher(text, i);
         if (m.matched) {
           const piece = text.slice(start, m.endAt);
-          const trimmed = piece.replace(/^\s+|\s+$/g, "");
-          if (trimmed) {
-            groups[groups.length - 1].push({ kind: "text", value: trimmed });
+          if (piece) {
+            groups[groups.length - 1].push({ kind: "text", value: piece });
           }
           groups.push([]);
           start = m.nextStart;
@@ -91,19 +92,51 @@ function splitByMatcher(
       i++;
     }
     const tail = text.slice(start);
-    const tailTrimmed = tail.replace(/^\s+|\s+$/g, "");
-    if (tailTrimmed) {
-      groups[groups.length - 1].push({ kind: "text", value: tailTrimmed });
+    if (tail) groups[groups.length - 1].push({ kind: "text", value: tail });
+
+    // Cross-segment sentence boundary: when a text segment ends with sentence
+    // punctuation followed by whitespace and the next segment is a cloze, the
+    // sentence boundary is real even though the matcher's lookahead can't see
+    // past the segment edge.
+    if (
+      crossBoundary &&
+      depth === 0 &&
+      segIdx + 1 < segments.length &&
+      segments[segIdx + 1].kind === "cloze" &&
+      /[.!?;]\s+$/.test(text.slice(start))
+    ) {
+      groups.push([]);
     }
   }
 
+  // Trim only the leading whitespace of each group's first text segment and
+  // the trailing whitespace of its last text segment. Interior whitespace
+  // between segments is preserved so cloze content stays visually separated
+  // from the surrounding prose.
   return groups
-    .map((g) =>
-      g.filter(
-        (s) => s.kind === "cloze" || (s.kind === "text" && s.value.length > 0)
-      )
-    )
+    .map((g) => trimGroupEdges(g))
     .filter((g) => g.length > 0);
+}
+
+function trimGroupEdges(group: ClozeSegment[]): ClozeSegment[] {
+  if (group.length === 0) return group;
+  let out = group;
+  const first = out[0];
+  if (first.kind === "text") {
+    const trimmed = first.value.replace(/^\s+/, "");
+    if (trimmed.length === 0) out = out.slice(1);
+    else out = [{ kind: "text", value: trimmed }, ...out.slice(1)];
+  }
+  if (out.length === 0) return out;
+  const last = out[out.length - 1];
+  if (last.kind === "text") {
+    const trimmed = last.value.replace(/\s+$/, "");
+    if (trimmed.length === 0) out = out.slice(0, -1);
+    else out = [...out.slice(0, -1), { kind: "text", value: trimmed }];
+  }
+  return out.filter(
+    (s) => s.kind === "cloze" || (s.kind === "text" && s.value.length > 0)
+  );
 }
 
 function tryAsList(segments: ClozeSegment[]): ListBlock | null {
@@ -134,6 +167,17 @@ function tryAsList(segments: ClozeSegment[]): ListBlock | null {
   }
   if (colonSegIdx < 0) return null;
 
+  // A list-shaped sentence with no clozes in the body is just enumerative
+  // prose ("Ask: a, b, or c?") — render it as a paragraph instead of a list.
+  let bodyHasCloze = false;
+  for (let i = colonSegIdx + 1; i < segments.length; i++) {
+    if (segments[i].kind === "cloze") {
+      bodyHasCloze = true;
+      break;
+    }
+  }
+  if (!bodyHasCloze) return null;
+
   const header: ClozeSegment[] = [];
   const body: ClozeSegment[] = [];
   for (let i = 0; i < segments.length; i++) {
@@ -150,21 +194,31 @@ function tryAsList(segments: ClozeSegment[]): ListBlock | null {
     }
   }
 
-  const items = splitByMatcher(body, commaMatcher);
+  // Choose the split mode based on body shape:
+  // - Body is a single sentence with comma-separated items → comma split.
+  // - Body is multiple full sentences (each starts with a cloze, ends with
+  //   ". " or "; ") → each sentence is one list item.
+  // - 2-sentence bodies are ambiguous (header + epilogue?) → not a list.
+  const bodySentences = splitByMatcher(body, sentenceMatcher, true);
+  let items: ClozeSegment[][];
+  if (bodySentences.length >= 3) {
+    items = bodySentences;
+  } else if (bodySentences.length <= 1) {
+    items = splitByMatcher(body, commaMatcher);
+  } else {
+    return null;
+  }
   if (items.length < 3) return null;
 
-  // Strip trailing punctuation from the last item's last text segment.
-  const last = items[items.length - 1];
-  if (last.length > 0) {
-    const tailSeg = last[last.length - 1];
-    if (tailSeg.kind === "text") {
-      const cleaned = tailSeg.value.replace(/[.,;:\s]+$/, "");
-      if (cleaned.length === 0) {
-        last.pop();
-      } else {
-        last[last.length - 1] = { kind: "text", value: cleaned };
-      }
-    }
+  // Strip trailing punctuation from each item's last text segment so the list
+  // reads cleanly regardless of which delimiter we used.
+  for (const item of items) {
+    if (item.length === 0) continue;
+    const tailSeg = item[item.length - 1];
+    if (tailSeg.kind !== "text") continue;
+    const cleaned = tailSeg.value.replace(/[.,;:\s]+$/, "");
+    if (cleaned.length === 0) item.pop();
+    else item[item.length - 1] = { kind: "text", value: cleaned };
   }
 
   return { kind: "list", header, items };
@@ -172,7 +226,16 @@ function tryAsList(segments: ClozeSegment[]): ListBlock | null {
 
 function buildBlocks(text: string): Block[] {
   const segments = tokenize(text);
-  const sentences = splitByMatcher(segments, sentenceMatcher);
+
+  // Prefer treating the whole card as one list when there's a single header
+  // colon — this is how most cloze cards are actually written, including
+  // ones whose items are separated by ". " across cloze boundaries.
+  const wholeAsList = tryAsList(segments);
+  if (wholeAsList) return [wholeAsList];
+
+  // Otherwise split into sentences (with cross-segment boundary support) and
+  // try the same list detection on each. Plain sentences become paragraphs.
+  const sentences = splitByMatcher(segments, sentenceMatcher, true);
   return sentences.map((s) => {
     const list = tryAsList(s);
     return list ?? { kind: "para", segments: s };
