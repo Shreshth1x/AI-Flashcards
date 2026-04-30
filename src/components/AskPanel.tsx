@@ -15,6 +15,8 @@ type Props = {
   card: CardType;
   item: QueueItem;
   sectionLabel: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 };
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
@@ -57,8 +59,13 @@ function makeCardContext(
   };
 }
 
-export function AskPanel({ card, item, sectionLabel }: Props) {
-  const [open, setOpen] = React.useState(false);
+export function AskPanel({
+  card,
+  item,
+  sectionLabel,
+  open,
+  onOpenChange,
+}: Props) {
   const [input, setInput] = React.useState("");
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
   const [pending, setPending] = React.useState(false);
@@ -111,19 +118,19 @@ export function AskPanel({ card, item, sectionLabel }: Props) {
     setPending(false);
   }, [cardKey]);
 
-  // Cmd/Ctrl+K opens panel and focuses input.
+  // Cmd/Ctrl+K toggles panel and focuses input on open.
   React.useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const isMod = e.metaKey || e.ctrlKey;
       if (isMod && (e.key === "k" || e.key === "K")) {
         e.preventDefault();
-        setOpen(true);
+        onOpenChange(true);
         requestAnimationFrame(() => inputRef.current?.focus());
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [onOpenChange]);
 
   // Auto-scroll on new content.
   React.useEffect(() => {
@@ -290,160 +297,178 @@ export function AskPanel({ card, item, sectionLabel }: Props) {
 
   const cardImageCount = cardImagesB64.length;
 
-  if (!open) {
-    return (
-      <div className="mt-6 flex justify-center">
+  return (
+    <>
+      {/* Floating trigger when closed */}
+      {!open && (
         <Button
           variant="outline"
           size="sm"
           onClick={() => {
-            setOpen(true);
+            onOpenChange(true);
             requestAnimationFrame(() => inputRef.current?.focus());
           }}
+          className="fixed right-4 bottom-6 z-30 shadow-pop animate-fade-in-soft"
         >
-          <span className="inline-block h-1.5 w-1.5 rounded-full bg-brand mr-1" />
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-brand" />
           <Sparkles className="h-4 w-4" />
           Ask the tutor
-          <kbd className="ml-1.5">⌘K</kbd>
+          <kbd className="ml-1.5 hidden sm:inline">⌘K</kbd>
         </Button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="mt-6 border border-border rounded-lg bg-card text-card-foreground shadow-soft overflow-hidden animate-fade-in">
-      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border/60">
-        <Sparkles className="h-3.5 w-3.5 text-brand" />
-        <span className="text-xs font-medium uppercase tracking-wider">
-          Tutor
-        </span>
-        {cardImageCount > 0 ? (
-          <span className="inline-flex items-center gap-1 text-[11px] text-brand bg-brand/10 px-2 py-0.5 rounded-full">
-            <ImageIcon className="h-3 w-3" />
-            sees {cardImageCount} card image{cardImageCount === 1 ? "" : "s"}
-          </span>
-        ) : (
-          <span className="text-[11px] text-muted-foreground">
-            asking about this card
-          </span>
-        )}
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          onClick={() => setOpen(false)}
-          aria-label="Close tutor"
-          className="ml-auto"
-        >
-          <X className="h-3.5 w-3.5" />
-        </Button>
-      </div>
-
-      <div
-        ref={scrollRef}
-        className="px-4 py-3 max-h-[340px] overflow-y-auto space-y-3 text-sm leading-relaxed"
-      >
-        {messages.length === 0 && (
-          <p className="text-muted-foreground text-[13px]">
-            Ask anything about this card — why this bucket, what the alternative
-            would be, what the underlying mental model is. Paste or drop an
-            image to ask about it directly.
-          </p>
-        )}
-        {messages.map((m, i) => (
-          <Bubble
-            key={i}
-            role={m.role}
-            content={m.content}
-            streaming={
-              pending && i === messages.length - 1 && m.role === "assistant"
-            }
-          />
-        ))}
-        {error && <p className="text-xs text-destructive">{error}</p>}
-      </div>
-
-      {pendingImages.length > 0 && (
-        <div className="px-3 pt-2 flex flex-wrap items-center gap-2 border-t border-border/60">
-          {pendingImages.map((p) => (
-            <div key={p.id} className="relative">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={p.previewUrl}
-                alt=""
-                className="h-10 w-10 rounded-md object-cover border border-border"
-                draggable={false}
-              />
-              <button
-                type="button"
-                onClick={() => removePending(p.id)}
-                aria-label="Remove image"
-                className="absolute -top-1.5 -right-1.5 h-4 w-4 grid place-items-center rounded-full bg-foreground text-background hover:opacity-90"
-              >
-                <X className="h-2.5 w-2.5" />
-              </button>
-            </div>
-          ))}
-          <span className="text-[11px] text-muted-foreground tabular-nums">
-            {pendingImages.length}/{MAX_INLINE} attached
-          </span>
-        </div>
       )}
 
-      <div
-        className={`px-3 py-2.5 border-t border-border/60 flex gap-2 items-end transition-colors duration-1 ${
-          dragOver ? "bg-brand/5" : ""
-        }`}
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragOver(true);
-        }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={onDrop}
+      {/* Mobile backdrop */}
+      {open && (
+        <div
+          className="fixed inset-0 z-30 bg-background/60 backdrop-blur-sm lg:hidden animate-fade-in-soft"
+          onClick={() => onOpenChange(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside
+        aria-label="AI tutor"
+        aria-hidden={!open}
+        className={[
+          "fixed top-0 right-0 bottom-0 z-40 w-full sm:w-[400px]",
+          "border-l border-border bg-card text-card-foreground shadow-pop",
+          "flex flex-col",
+          "transition-transform duration-2 ease-out",
+          open ? "translate-x-0" : "translate-x-full pointer-events-none",
+        ].join(" ")}
       >
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          onClick={() => fileInputRef.current?.click()}
-          aria-label="Attach image"
-          disabled={pendingImages.length >= MAX_INLINE || pending}
-        >
-          <Paperclip className="h-4 w-4" />
-        </Button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          multiple
-          onChange={onPickFiles}
-          className="hidden"
-        />
-        <Textarea
-          ref={inputRef}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={onInputKeyDown}
-          onPaste={onPaste}
-          placeholder="Why this bucket? What would change with a different industry?"
-          rows={1}
-          className="text-sm min-h-[36px] max-h-[120px] resize-none py-2"
-          disabled={pending}
-        />
-        {pending ? (
-          <Button onClick={cancel} variant="outline" size="sm">
-            Stop
-          </Button>
-        ) : (
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-border/60 shrink-0">
+          <Sparkles className="h-4 w-4 text-brand" />
+          <span className="text-sm font-semibold tracking-tight">Tutor</span>
+          {cardImageCount > 0 ? (
+            <span className="inline-flex items-center gap-1 text-[11px] text-brand bg-brand/10 px-2 py-0.5 rounded-full">
+              <ImageIcon className="h-3 w-3" />
+              sees {cardImageCount} image{cardImageCount === 1 ? "" : "s"}
+            </span>
+          ) : (
+            <span className="text-[11px] text-muted-foreground truncate">
+              {sectionLabel}
+            </span>
+          )}
           <Button
-            onClick={send}
-            size="sm"
-            disabled={input.trim().length === 0 && pendingImages.length === 0}
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => onOpenChange(false)}
+            aria-label="Close tutor"
+            className="ml-auto"
           >
-            <Send className="h-3.5 w-3.5" />
-            Send
+            <X className="h-4 w-4" />
           </Button>
+        </div>
+
+        <div
+          ref={scrollRef}
+          className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-3 text-sm leading-relaxed"
+        >
+          {messages.length === 0 && (
+            <p className="text-muted-foreground text-[13px]">
+              Ask anything about this card — why this bucket, what the
+              alternative would be, what the underlying mental model is. Paste
+              or drop an image to ask about it directly.
+            </p>
+          )}
+          {messages.map((m, i) => (
+            <Bubble
+              key={i}
+              role={m.role}
+              content={m.content}
+              streaming={
+                pending && i === messages.length - 1 && m.role === "assistant"
+              }
+            />
+          ))}
+          {error && <p className="text-xs text-destructive">{error}</p>}
+        </div>
+
+        {pendingImages.length > 0 && (
+          <div className="px-3 pt-2 flex flex-wrap items-center gap-2 border-t border-border/60 shrink-0">
+            {pendingImages.map((p) => (
+              <div key={p.id} className="relative">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={p.previewUrl}
+                  alt=""
+                  className="h-10 w-10 rounded-md object-cover border border-border"
+                  draggable={false}
+                />
+                <button
+                  type="button"
+                  onClick={() => removePending(p.id)}
+                  aria-label="Remove image"
+                  className="absolute -top-1.5 -right-1.5 h-4 w-4 grid place-items-center rounded-full bg-foreground text-background hover:opacity-90"
+                >
+                  <X className="h-2.5 w-2.5" />
+                </button>
+              </div>
+            ))}
+            <span className="text-[11px] text-muted-foreground tabular-nums">
+              {pendingImages.length}/{MAX_INLINE} attached
+            </span>
+          </div>
         )}
-      </div>
-    </div>
+
+        <div
+          className={`px-3 py-2.5 border-t border-border/60 flex gap-2 items-end transition-colors duration-1 shrink-0 ${
+            dragOver ? "bg-brand/5" : ""
+          }`}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragOver(true);
+          }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={onDrop}
+        >
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => fileInputRef.current?.click()}
+            aria-label="Attach image"
+            disabled={pendingImages.length >= MAX_INLINE || pending}
+          >
+            <Paperclip className="h-4 w-4" />
+          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={onPickFiles}
+            className="hidden"
+          />
+          <Textarea
+            ref={inputRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={onInputKeyDown}
+            onPaste={onPaste}
+            placeholder="Why this bucket? What would change with a different industry?"
+            rows={1}
+            className="text-sm min-h-[36px] max-h-[120px] resize-none py-2"
+            disabled={pending}
+          />
+          {pending ? (
+            <Button onClick={cancel} variant="outline" size="sm">
+              Stop
+            </Button>
+          ) : (
+            <Button
+              onClick={send}
+              size="sm"
+              disabled={input.trim().length === 0 && pendingImages.length === 0}
+            >
+              <Send className="h-3.5 w-3.5" />
+              Send
+            </Button>
+          )}
+        </div>
+      </aside>
+    </>
   );
 }
 

@@ -19,6 +19,7 @@ export default function DrillPage() {
   const [state, setState] = React.useState<AppState | null>(null);
   const [session, setSession] = React.useState<ActiveSession | null>(null);
   const [hydrated, setHydrated] = React.useState(false);
+  const [askOpen, setAskOpen] = React.useState(false);
 
   React.useEffect(() => {
     setState(loadState());
@@ -126,7 +127,12 @@ export default function DrillPage() {
   }
 
   return (
-    <main className="min-h-screen flex flex-col">
+    <main
+      className={[
+        "min-h-screen flex flex-col transition-[padding] duration-2 ease-out",
+        askOpen ? "lg:pr-[400px]" : "",
+      ].join(" ")}
+    >
       <header className="bg-background/80 backdrop-blur-md sticky top-0 z-20">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-3">
           <Button
@@ -207,6 +213,8 @@ export default function DrillPage() {
             state.sections.find((s) => s.id === currentCard.sectionId)?.name ??
             "Section"
           }
+          open={askOpen}
+          onOpenChange={setAskOpen}
         />
 
         <p className="mt-8 text-center text-[11px] text-muted-foreground tracking-wide">
