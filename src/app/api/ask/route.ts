@@ -1,11 +1,32 @@
 import { NextRequest } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+import { Ratelimit } from "@upstash/ratelimit";
+import { Redis } from "@upstash/redis";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const MODEL = "claude-opus-4-7";
+
+// Per-IP sliding window. No-op when Upstash env vars are absent (local dev).
+const ratelimit =
+  process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
+    ? new Ratelimit({
+        redis: Redis.fromEnv(),
+        limiter: Ratelimit.slidingWindow(30, "1 h"),
+        analytics: true,
+        prefix: "mck:ask",
+      })
+    : null;
+
+function getClientIp(req: NextRequest): string {
+  const xff = req.headers.get("x-forwarded-for");
+  if (xff) return xff.split(",")[0]!.trim();
+  const real = req.headers.get("x-real-ip");
+  if (real) return real.trim();
+  return "anon";
+}
 
 const ALLOWED_MIME = new Set([
   "image/jpeg",
@@ -130,6 +151,29 @@ export async function POST(req: NextRequest) {
       }),
       { status: 500, headers: { "content-type": "application/json" } }
     );
+  }
+
+  if (ratelimit) {
+    const ip = getClientIp(req);
+    const { success, limit, reset, remaining } = await ratelimit.limit(ip);
+    if (!success) {
+      const retryAfter = Math.max(1, Math.ceil((reset - Date.now()) / 1000));
+      return new Response(
+        JSON.stringify({
+          error: `Rate limit hit (${limit} requests/hour). Try again in ${retryAfter}s.`,
+        }),
+        {
+          status: 429,
+          headers: {
+            "content-type": "application/json",
+            "retry-after": String(retryAfter),
+            "x-ratelimit-limit": String(limit),
+            "x-ratelimit-remaining": String(remaining),
+            "x-ratelimit-reset": String(reset),
+          },
+        }
+      );
+    }
   }
 
   let body: AskBody;
