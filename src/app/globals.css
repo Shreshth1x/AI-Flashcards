@@ -2,26 +2,385 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    /* Surface */
+    --background: 0 0% 99%;
+    --foreground: 222 24% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 24% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 24% 11%;
+
+    /* Roles */
+    --primary: 222 24% 11%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 222 24% 11%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 46%;
+    --accent: 220 14% 94%;
+    --accent-foreground: 222 24% 11%;
+
+    /* Brand — used for focus rings, streaming caret, links, accent dots */
+    --brand: 220 90% 56%;
+    --brand-foreground: 0 0% 100%;
+
+    /* Status */
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 142 64% 42%;
+    --success-foreground: 0 0% 100%;
+    --warning: 32 92% 50%;
+    --warning-foreground: 30 70% 15%;
+
+    /* Lines */
+    --border: 220 14% 91%;
+    --input: 220 14% 91%;
+    --ring: 220 90% 56%;
+
+    /* Radii */
+    --r-sm: 6px;
+    --r-md: 10px;
+    --r-lg: 14px;
+    --r-xl: 20px;
+    --radius: 14px;
+
+    /* Elevation */
+    --shadow-1: 0 1px 2px hsl(222 24% 11% / 0.04),
+      0 1px 1px hsl(222 24% 11% / 0.03);
+    --shadow-2: 0 8px 24px hsl(222 24% 11% / 0.10),
+      0 2px 6px hsl(222 24% 11% / 0.06);
+
+    /* Motion */
+    --dur-1: 120ms;
+    --dur-2: 200ms;
+    --dur-3: 320ms;
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+
+    /* Anki grade tones — slightly desaturated from raw */
+    --anki-again: 0 65% 52%;
+    --anki-hard: 25 87% 54%;
+    --anki-good: 142 56% 42%;
+    --anki-easy: 217 83% 56%;
+    --anki-cloze: 220 90% 56%;
+    --anki-cloze-bg: 220 90% 96%;
+    --anki-revealed-bg: 142 50% 92%;
+    --anki-revealed-fg: 142 70% 18%;
+  }
+
+  .dark {
+    --background: 222 18% 7%;
+    --foreground: 210 28% 96%;
+    --card: 222 16% 10%;
+    --card-foreground: 210 28% 96%;
+    --popover: 222 18% 9%;
+    --popover-foreground: 210 28% 96%;
+
+    --primary: 210 28% 96%;
+    --primary-foreground: 222 24% 11%;
+    --secondary: 220 12% 16%;
+    --secondary-foreground: 210 28% 96%;
+    --muted: 220 12% 16%;
+    --muted-foreground: 220 10% 64%;
+    --accent: 220 12% 18%;
+    --accent-foreground: 210 28% 96%;
+
+    --brand: 220 92% 64%;
+    --brand-foreground: 222 24% 11%;
+
+    --destructive: 0 65% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 142 56% 50%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 58%;
+    --warning-foreground: 30 70% 95%;
+
+    --border: 220 12% 18%;
+    --input: 220 12% 18%;
+    --ring: 220 92% 64%;
+
+    --shadow-1: 0 1px 2px hsl(0 0% 0% / 0.40),
+      0 1px 1px hsl(0 0% 0% / 0.30);
+    --shadow-2: 0 12px 32px hsl(0 0% 0% / 0.50),
+      0 2px 8px hsl(0 0% 0% / 0.30);
+
+    --anki-again: 0 60% 58%;
+    --anki-hard: 25 80% 60%;
+    --anki-good: 142 50% 52%;
+    --anki-easy: 217 85% 64%;
+    --anki-cloze: 220 92% 70%;
+    --anki-cloze-bg: 220 50% 22%;
+    --anki-revealed-bg: 142 30% 22%;
+    --anki-revealed-fg: 142 65% 80%;
   }
 }
 
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "ss01", "cv11", "tnum";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Soft, brand-tinted focus ring everywhere */
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring) / 0.35);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* Canonical kbd */
+  kbd {
+    font: 11px/1 ui-monospace, "Geist Mono", SFMono-Regular, Menlo, monospace;
+    padding: 2px 5px;
+    border-radius: 5px;
+    background: hsl(var(--muted));
+    border: 1px solid hsl(var(--border));
+    box-shadow: 0 1px 0 hsl(var(--border));
+    color: hsl(var(--muted-foreground));
+    letter-spacing: 0;
+  }
+
+  /* Honor user motion preference */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  /* ── Drill card ──────────────────────────────────── */
+  .anki-card-shell {
+    width: 100%;
+  }
+
+  .anki-card {
+    @apply bg-card text-card-foreground;
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--r-xl);
+    box-shadow: var(--shadow-1);
+    padding: 36px 28px;
+    min-height: 320px;
+    line-height: 1.65;
+  }
+  @media (min-width: 640px) {
+    .anki-card {
+      padding: 56px 48px;
+    }
+  }
+
+  .anki-text {
+    font-size: 20px;
+    line-height: 1.65;
+    letter-spacing: -0.014em;
+  }
+
+  .anki-hint {
+    color: hsl(var(--muted-foreground));
+    font-style: italic;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  .anki-hint-label {
+    color: hsl(var(--muted-foreground));
+    font-style: normal;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-right: 6px;
+  }
+
+  .anki-typed {
+    color: hsl(var(--muted-foreground));
+    font-size: 15px;
+    line-height: 1.6;
+    border-left: 2px solid hsl(var(--border));
+    padding-left: 12px;
+  }
+
+  .anki-section-label {
+    color: hsl(var(--muted-foreground));
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .anki-list {
+    list-style: decimal outside;
+    padding-left: 1.75rem;
+    font-feature-settings: "tnum" 1;
+  }
+  .anki-list > li {
+    padding-left: 4px;
+  }
+  .anki-list > li::marker {
+    color: hsl(var(--muted-foreground));
+    font-weight: 500;
+  }
+
+  .anki-divider {
+    height: 1px;
+    background: hsl(var(--border) / 0.7);
+    margin: 28px 0;
+  }
+
+  /* ── Cloze ───────────────────────────────────────── */
+  .cloze-blank {
+    color: hsl(var(--anki-cloze));
+    background-color: hsl(var(--anki-cloze-bg));
+    padding: 1px 8px;
+    border-radius: var(--r-sm);
+    font-weight: 600;
+    font-feature-settings: "tnum" 1;
+  }
+
+  .cloze-revealed {
+    background-color: hsl(var(--anki-revealed-bg));
+    color: hsl(var(--anki-revealed-fg));
+    padding: 1px 6px;
+    border-radius: var(--r-sm);
+    font-weight: 600;
+  }
+
+  /* ── Grade buttons ───────────────────────────────── */
+  .anki-grade {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 12px 12px 10px;
+    border-radius: var(--r-md);
+    border: 1px solid transparent;
+    color: white;
+    font-size: 14px;
+    font-weight: 600;
+    user-select: none;
+    box-shadow: var(--shadow-1),
+      inset 0 1px 0 hsl(0 0% 100% / 0.16);
+    transition: transform var(--dur-1) var(--ease-out),
+      background-color var(--dur-1) var(--ease-out),
+      box-shadow var(--dur-1) var(--ease-out);
+  }
+  .anki-grade:hover {
+    background-color: hsl(var(--_grade) / 0.92);
+  }
+  .anki-grade:active {
+    transform: translateY(0.5px);
+    box-shadow: var(--shadow-1);
+  }
+  .anki-grade-interval {
+    font-size: 11px;
+    font-weight: 500;
+    opacity: 0.85;
+    font-feature-settings: "tnum" 1;
+    letter-spacing: 0.02em;
+  }
+  .anki-grade-label {
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.1;
+  }
+  .anki-grade-kbd {
+    font: 10px/1 ui-monospace, "Geist Mono", SFMono-Regular, Menlo, monospace;
+    margin-top: 2px;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    color: hsl(0 0% 100% / 0.7);
+  }
+  .anki-grade-again {
+    --_grade: var(--anki-again);
+    background-color: hsl(var(--anki-again));
+  }
+  .anki-grade-hard {
+    --_grade: var(--anki-hard);
+    background-color: hsl(var(--anki-hard));
+  }
+  .anki-grade-good {
+    --_grade: var(--anki-good);
+    background-color: hsl(var(--anki-good));
+  }
+  .anki-grade-easy {
+    --_grade: var(--anki-easy);
+    background-color: hsl(var(--anki-easy));
+  }
+
+  /* ── Top deck-counts pill ────────────────────────── */
+  .anki-top-counts {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    padding: 4px 12px;
+    border-radius: 9999px;
+    background: hsl(var(--muted) / 0.6);
+    font-size: 12px;
+    font-feature-settings: "tnum" 1;
+  }
+  .anki-count-new {
+    color: hsl(var(--anki-easy));
+    font-weight: 600;
+  }
+  .anki-count-learn {
+    color: hsl(var(--anki-again));
+    font-weight: 600;
+  }
+  .anki-count-review {
+    color: hsl(var(--anki-good));
+    font-weight: 600;
+  }
+  .anki-count-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 9999px;
+    margin-right: 6px;
+    vertical-align: 1px;
+  }
+  .anki-count-dot-new {
+    background-color: hsl(var(--anki-easy));
+  }
+  .anki-count-dot-learn {
+    background-color: hsl(var(--anki-again));
+  }
+  .anki-count-dot-review {
+    background-color: hsl(var(--anki-good));
+  }
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+
+  .shadow-soft {
+    box-shadow: var(--shadow-1);
+  }
+  .shadow-pop {
+    box-shadow: var(--shadow-2);
+  }
+
+  .ease-out-soft {
+    transition-timing-function: var(--ease-out);
+  }
+  .ease-spring {
+    transition-timing-function: var(--ease-out);
   }
 }
